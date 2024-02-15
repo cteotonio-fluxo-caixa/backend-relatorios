@@ -1,9 +1,12 @@
 using FluxoCaixa.Relatorio.API;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.OpenApi.Models;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text.Json.Serialization;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
@@ -44,10 +47,23 @@ public class RelatorioDbContext : DbContext
     public DbSet<Transacao> Transacoes { get; set; }
 
     public RelatorioDbContext(DbContextOptions options) : base(options) { }
+
+    public async Task<List<Transacao>>  GetTransacoesPorDataAsync(DateTime Data)
+    {
+        string sql = @"SELECT T.TransacaoId, T.Valor, T.DataTransacao, T.Descricao, CT.Nome AS NomeCategoria, MP.Nome AS NomeMetodoPagamento 
+                       FROM Transacoes T
+                       INNER JOIN CategoriasTransacoes CT ON T.CategoriaId = CT.CategoriaId
+                       INNER JOIN MetodosPagamento MP ON T.MetodoPagamentoId = MP.MetodoPagamentoId 
+                       WHERE CONVERT(Date, DataTransacao) = @DataTransacao "
+        ;
+
+        return await Transacoes.FromSqlRaw(sql, new SqlParameter("@DataTransacao", Data.Date)).ToListAsync();
+    }
 }
 
 public class SaldoDia
 {
+    [JsonIgnore]
     [Key]
     public Guid SaldoDiaId { get; set; }
     public DateTime DataSaldo { get; set; }
@@ -68,6 +84,9 @@ public class RelatorioSaldoDia
 /// </summary>
 public class Transacao
 {
+    [JsonIgnore]
+    [Key]
+    public Guid TransacaoId { get; set; }
     /// <summary>
     /// Valor da transação
     /// </summary>
